@@ -2,24 +2,29 @@ import koji
 from koji.tasks import BaseTaskHandler
 import sys
 
-import time  # DBG
-
-class RunTestsPlugin(BaseTaskHandler):
+class RunTestsTask(BaseTaskHandler):
     Methods = ['runTests']
     _taskWeight = 2.0
 
     def __init__(self, *args, **kwargs):
-        super(RunTestsPlugin, self).__init__(*args, **kwargs)
+        super(RunTestsTask, self).__init__(*args, **kwargs)
 
-    def handler(self, *args, **kwargs):
+    def handler(self, build_id):
         print "### RunTests called. ###\n"
-        #time.sleep(15)
-        #raise Exception
         rpms = self.session.listBuildRPMs(build_id)
-        return "run_tests/builder(%s, %s): success; rpms: %s" % (str(args), str(kwargs), str(rpms))
+        kojidir_prefix = "/mnt/koji/packages/"
+        s = ""
+        for rpm_info in rpms:
+            if rpm_info['arch'] == 'src':
+                continue
+            rpm_fname = "%s.%s.rpm" % (rpm_info['nvr'], rpm_info['arch'])
+            rpm_path = kojidir_prefix + "/".join(map(rpm_info.get, ['name', 'version', 'release', 'arch'])) + "/" + rpm_fname
+            s += "Installing RPM file: " + rpm_path + "\n"
+
+        return "Result: success; build_id: %s, rpms: %s" % (str(build_id), s)
 
 # Override tagBuild task handler to add post-build tests
-class TagBuildTask(BaseTaskHandler):
+class TagBuildWithTestsTask(BaseTaskHandler):
 
     Methods = ['tagBuild']
     #XXX - set weight?
@@ -37,7 +42,7 @@ class TagBuildTask(BaseTaskHandler):
 
             #XXX - add more post tests
             task_id = self.session.host.subtask(method = 'runTests',
-                                                arglist = [tag_id, build_id, self.id],
+                                                arglist = [build_id],
                                                 label = 'test',
                                                 parent = self.id,
                                                 arch = 'noarch')
