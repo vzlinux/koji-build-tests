@@ -1,7 +1,8 @@
 import koji
 from koji.tasks import BaseTaskHandler
-import time
 import sys
+
+import time  # DBG
 
 class RunTestsPlugin(BaseTaskHandler):
     Methods = ['runtests']
@@ -34,14 +35,14 @@ class TagBuildTask(BaseTaskHandler):
             #computationally expensive 'post' tests.
 
             #XXX - add more post tests
-            task_id = self.session.host.subtask(method='runtests',
-                                       arglist=[tag_id,build_id],
-                                       label='test',
-                                       parent=self.id,
-                                       arch='noarch')
+            task_id = self.session.host.subtask(method = 'runtests',
+                                                arglist = [tag_id, build_id],
+                                                label = 'test',
+                                                parent = self.id,
+                                                arch = 'noarch')
             self.wait(task_id)
 
-            self.session.host.tagBuild(self.id,tag_id,build_id,force=force,fromtag=fromtag)
+            self.session.host.tagBuild(self.id, tag_id, build_id, force=force, fromtag=fromtag)
             self.session.host.tagNotification(True, tag_id, fromtag, build_id, user_id, ignore_success)
         except Exception, e:
             exctype, value = sys.exc_info()[:2]
