@@ -5,7 +5,7 @@ import sys
 import time  # DBG
 
 class RunTestsPlugin(BaseTaskHandler):
-    Methods = ['runtests']
+    Methods = ['runTests']
     _taskWeight = 2.0
 
     def __init__(self, *args, **kwargs):
@@ -35,8 +35,8 @@ class TagBuildTask(BaseTaskHandler):
             #computationally expensive 'post' tests.
 
             #XXX - add more post tests
-            task_id = self.session.host.subtask(method = 'runtests',
-                                                arglist = [tag_id, build_id],
+            task_id = self.session.host.subtask(method = 'runTests',
+                                                arglist = [tag_id, build_id, self.id],
                                                 label = 'test',
                                                 parent = self.id,
                                                 arch = 'noarch')
