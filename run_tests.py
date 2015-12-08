@@ -13,9 +13,10 @@ class RunTestsPlugin(BaseTaskHandler):
 
     def handler(self, *args, **kwargs):
         print "### RunTests called. ###\n"
-        time.sleep(15)
+        #time.sleep(15)
         #raise Exception
-        return "run_tests/builder(%s, %s): success" % (str(args), str(kwargs))
+        rpms = self.session.listBuildRPMs(build_id)
+        return "run_tests/builder(%s, %s): success; rpms: %s" % (str(args), str(kwargs), str(rpms))
 
 # Override tagBuild task handler to add post-build tests
 class TagBuildTask(BaseTaskHandler):
