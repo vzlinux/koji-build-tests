@@ -1,7 +1,12 @@
 import koji
 from koji.tasks import BaseTaskHandler
 import sys
+import os
+from tempfile import mkdtemp, mkstemp
+import shutil
 
+
+# Handler for running post-build tests
 class RunTestsTask(BaseTaskHandler):
     Methods = ['runTests']
     _taskWeight = 2.0
@@ -9,7 +14,7 @@ class RunTestsTask(BaseTaskHandler):
     def __init__(self, *args, **kwargs):
         super(RunTestsTask, self).__init__(*args, **kwargs)
 
-    def handler(self, build_id):
+    def handler(self, tag_id, build_id):
         print "### RunTests called. ###\n"
         rpms = self.session.listBuildRPMs(build_id)
         kojidir_prefix = "/mnt/koji/packages/"
@@ -18,10 +23,35 @@ class RunTestsTask(BaseTaskHandler):
             if rpm_info['arch'] == 'src':
                 continue
             rpm_fname = "%s.%s.rpm" % (rpm_info['nvr'], rpm_info['arch'])
-            rpm_path = kojidir_prefix + "/".join(map(rpm_info.get, ['name', 'version', 'release', 'arch'])) + "/" + rpm_fname
+            rpm_path = kojidir_prefix + "/".join(map(rpm_info.get, ['name', 'version', 'release', 'arch']) + [rpm_fname])
             s += "Installing RPM file: " + rpm_path + "\n"
 
-        return "Result: success; build_id: %s, rpms: %s" % (str(build_id), s)
+            taginfo = self.session.getTag(tag_id, strict=True)
+            repo_url = "/mnt/koji/repos/" + taginfo['name'] + "-build/latest/" + rpm_info['arch'] + "/"
+            (yumcfg_fd, yumcfg_file) = mkstemp(prefix='koji-test-yum-', suffix='.cfg', text=True)
+            os.write(yumcfg_fd, """
+[main]
+cachedir=/var/cache/yum
+debuglevel=1
+logfile=/var/log/yum.log
+reposdir=/dev/null
+retries=20
+obsoletes=1
+gpgcheck=0
+assumeyes=1
+[repository]
+name=VirtuozzoLinux
+baseurl=%s
+enabled=1
+gpgcheck=0
+""" % (repo_url))
+            os.close(yumcfg_fd)
+            tmpdir = mkdtemp(prefix='koji-test-root-')
+            res = os.system("yum install -y -c " + yumcfg_file + " --installroot=" + tmpdir + " " + rpm_path + ' >/tmp/koji-plugin-test.log 2>&1')
+            shutil.rmtree(tmpdir)
+            os.unlink(yumcfg_file)
+
+        return "Result: success; build_id: %s\ndata: %s\nres: %s" % (str(build_id), s, str(res))
 
 # Override tagBuild task handler to add post-build tests
 class TagBuildWithTestsTask(BaseTaskHandler):
@@ -42,7 +72,7 @@ class TagBuildWithTestsTask(BaseTaskHandler):
 
             #XXX - add more post tests
             task_id = self.session.host.subtask(method = 'runTests',
-                                                arglist = [build_id],
+                                                arglist = [tag_id, build_id],
                                                 label = 'test',
                                                 parent = self.id,
                                                 arch = 'noarch')
