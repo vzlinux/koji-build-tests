@@ -2,8 +2,8 @@ import koji
 from koji.tasks import BaseTaskHandler
 import sys
 import os
-from tempfile import mkdtemp, mkstemp
 import shutil
+from tempfile import mkdtemp, mkstemp
 
 
 # Handler for running post-build tests
@@ -14,20 +14,40 @@ class RunTestsTask(BaseTaskHandler):
     def __init__(self, *args, **kwargs):
         super(RunTestsTask, self).__init__(*args, **kwargs)
 
+    # Executes the command and logs its output to the specified file
+    def execLog(self, cmdline, logpath, append=False):
+        log_fd = open(logpath, "a" if append else "w")
+        log_fd.write("==> " + cmdline + "\n")
+        log_fd.close()
+        res = os.system(cmdline + " >>" + logpath + " 2>&1")
+        return res
+
+    # The task handler
     def handler(self, tag_id, build_id):
-        print "### RunTests called. ###\n"
         rpms = self.session.listBuildRPMs(build_id)
-        kojidir_prefix = "/mnt/koji/packages/"
-        s = ""
+        tag_info = self.session.getTag(tag_id, strict=True)
+        #build_info = self.session.getBuild(build_id)
+
+        # List all available RPM files
+        rpm_files = {}
         for rpm_info in rpms:
             if rpm_info['arch'] == 'src':
+                # Skip src.rpm
                 continue
             rpm_fname = "%s.%s.rpm" % (rpm_info['nvr'], rpm_info['arch'])
-            rpm_path = kojidir_prefix + "/".join(map(rpm_info.get, ['name', 'version', 'release', 'arch']) + [rpm_fname])
-            s += "Installing RPM file: " + rpm_path + "\n"
+            rpm_path = "/mnt/koji/packages/" + "/".join(map(rpm_info.get, ['name', 'version', 'release', 'arch']) + [rpm_fname])
+            rpm_files.setdefault(rpm_info['arch'], []).append(rpm_path)
 
-            taginfo = self.session.getTag(tag_id, strict=True)
-            repo_url = "/mnt/koji/repos/" + taginfo['name'] + "-build/latest/" + rpm_info['arch'] + "/"
+        # Test the packages from each architecture
+        for arch in rpm_files.keys():
+            # Construct path to the build tag repository
+            repo_path = "/mnt/koji/repos/" + tag_info['name'] + "-build/latest/"
+            if arch == "i686":
+                # Hack for different arch names in packages and repos
+                repo_path += "i386/"
+            else:
+                repo_path += arch + "/"
+            # Yum config for installation test
             (yumcfg_fd, yumcfg_file) = mkstemp(prefix='koji-test-yum-', suffix='.cfg', text=True)
             os.write(yumcfg_fd, """
 [main]
@@ -41,17 +61,28 @@ gpgcheck=0
 assumeyes=1
 [repository]
 name=VirtuozzoLinux
-baseurl=%s
+baseurl=file://%s
 enabled=1
 gpgcheck=0
-""" % (repo_url))
+""" % (repo_path))
             os.close(yumcfg_fd)
-            tmpdir = mkdtemp(prefix='koji-test-root-')
-            res = os.system("yum install -y -c " + yumcfg_file + " --installroot=" + tmpdir + " " + rpm_path + ' >/tmp/koji-plugin-test.log 2>&1')
-            shutil.rmtree(tmpdir)
+
+            # Root directory for installation test
+            tmp_dir = mkdtemp(prefix='koji-test-root-')
+
+            log_fname = "tests-" + arch + ".log"
+            log_fpath = tmp_dir + "/" + log_fname
+            cmdline = "yum install -v -y --config=%(yumcfg_file)s --installroot=%(tmp_dir)s " % locals() + " ".join(rpm_files[arch])
+            res = self.execLog(cmdline, log_fpath)
+            self.uploadFile(log_fpath)
+            shutil.rmtree(tmp_dir)
             os.unlink(yumcfg_file)
 
-        return "Result: success; build_id: %s\ndata: %s\nres: %s" % (str(build_id), s, str(res))
+            # Check result
+            if res != 0:
+                raise koji.BuildError, "Installation test failed, see %s for details." % (log_fname)
+
+        return "Result: success"
 
 # Override tagBuild task handler to add post-build tests
 class TagBuildWithTestsTask(BaseTaskHandler):
