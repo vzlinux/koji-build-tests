@@ -109,7 +109,8 @@ class TagBuildWithTestsTask(BaseTaskHandler):
                                                     arch = 'noarch')
                 self.wait(task_id)
             except koji.PostBuildError, e:
-                if not force:
+                # getPerms() always returns empty list; using explicit user ID instead
+                if not (force and ('admin' in self.session.getUserPerms(user_id))):
                     raise e
 
             self.session.host.tagBuild(self.id, tag_id, build_id, force=force, fromtag=fromtag)
