@@ -1,0 +1,36 @@
+This project is a Koji builder plugin to automatically run tests on the built
+packages before tagging them.
+
+Installation
+------------
+
+To install the plugin do the following:
+1. Create /usr/lib/koji-builder-plugins directory.
+2. Copy *.py from the current directory there.
+3. Open the file /etc/kojid/kojid.conf and uncomment or add the following
+   parameters, and set their values like that:
+	PluginPath = /usr/lib/koji-builder-plugins
+	Plugins = run_tests
+4. Restart Koji builder service:
+	# systemctl restart kojid.service
+
+Using
+-----
+
+After you install the plugin, the tagBuild task will run the new runTests
+subtask. If the latter fails, tagging will also fail, and the build will not be
+included into the tag.
+
+If build with failed tests must be tagged anyway, one can use the forced mode:
+$ koji tag-build --force tag_name build_name
+In this case the tests will still run but failure will not prevent the build
+from being tagged in the end.
+
+List of tests
+-------------
+
+At the moment only the installation test is performed: the set of RPM files for
+each architecture is installed into a clean root directory using the build tag
+repository as the only source of packages. Thus, the dependencies of the built
+packages are validated.
+
