@@ -80,7 +80,7 @@ gpgcheck=0
 
             # Check result
             if res != 0:
-                raise koji.BuildError, "Installation test failed, see %s for details." % (log_fname)
+                raise koji.PostBuildError, "Installation test failed, see %s for details." % (log_fname)
 
         return "Result: success"
 
@@ -101,13 +101,16 @@ class TagBuildWithTestsTask(BaseTaskHandler):
             #again when we make the final call). Our job is to perform the more
             #computationally expensive 'post' tests.
 
-            #XXX - add more post tests
-            task_id = self.session.host.subtask(method = 'runTests',
-                                                arglist = [tag_id, build_id],
-                                                label = 'test',
-                                                parent = self.id,
-                                                arch = 'noarch')
-            self.wait(task_id)
+            try:
+                task_id = self.session.host.subtask(method = 'runTests',
+                                                    arglist = [tag_id, build_id],
+                                                    label = 'test',
+                                                    parent = self.id,
+                                                    arch = 'noarch')
+                self.wait(task_id)
+            except koji.PostBuildError, e:
+                if not force:
+                    raise e
 
             self.session.host.tagBuild(self.id, tag_id, build_id, force=force, fromtag=fromtag)
             self.session.host.tagNotification(True, tag_id, fromtag, build_id, user_id, ignore_success)
