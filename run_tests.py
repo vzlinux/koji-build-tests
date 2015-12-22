@@ -59,6 +59,7 @@ retries=20
 obsoletes=1
 gpgcheck=0
 assumeyes=1
+tsflags=test
 [repository]
 name=VirtuozzoLinux
 baseurl=file://%s

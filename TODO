@@ -1,3 +1,6 @@
 * Extract the installation test into separate class, create an API for adding more tests.
 * Use task workdir instead of temp dir.
+* Fix for noarch.
+* Add installation test into create-mash script.
+* Add mail notifications for failed tests (modify existing fail mail?).
 
