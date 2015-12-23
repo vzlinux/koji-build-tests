@@ -1,6 +1,6 @@
 * Extract the installation test into separate class, create an API for adding more tests.
 * Use task workdir instead of temp dir.
-* Fix for noarch.
 * Add installation test into create-mash script.
+* Fix multiarch (i686 packages inside x86_64 repo) - only for mash generator.
 * Add mail notifications for failed tests (modify existing fail mail?).
 
