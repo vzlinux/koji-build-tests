@@ -7,12 +7,15 @@ Installation
 To install the plugin do the following:
 1. Create /usr/lib/koji-builder-plugins directory.
 2. Copy *.py from the current directory there.
-3. Open the file /etc/kojid/kojid.conf and uncomment or add the following
+3. Copy *conf file from the current directory to /etc/kojid/ folder
+4. Open the file /etc/kojid/kojid.conf and uncomment or add the following
    parameters, and set their values like that:
 	PluginPath = /usr/lib/koji-builder-plugins
 	Plugins = run_tests
-4. Restart Koji builder service:
+5. Restart Koji builder service:
 	# systemctl restart kojid.service
+6. Tests can be enabled/disabled by switching 'tests_enabled' flag in
+   /etc/kojid/run_tests.conf without restarting kojid
 
 Using
 -----
