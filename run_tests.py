@@ -4,7 +4,9 @@ import sys
 import os
 import shutil
 from tempfile import mkdtemp, mkstemp
+import ConfigParser
 
+CONFIG_FILE = '/etc/kojid/run_tests.conf'
 
 # Handler for running post-build tests
 class RunTestsTask(BaseTaskHandler):
@@ -13,6 +15,14 @@ class RunTestsTask(BaseTaskHandler):
 
     def __init__(self, *args, **kwargs):
         super(RunTestsTask, self).__init__(*args, **kwargs)
+
+    def _read_config(self):
+        cp = ConfigParser.SafeConfigParser()
+        cp.read(CONFIG_FILE)
+        if cp.has_option('general', 'tests_enabled'):
+            self.tests_enabled = cp.getboolean('general', 'tests_enabled')
+        else:
+            self.tests_enabled = True
 
     # Executes the command and logs its output to the specified file
     def execLog(self, cmdline, logpath, append=False):
@@ -24,6 +34,11 @@ class RunTestsTask(BaseTaskHandler):
 
     # The task handler
     def handler(self, tag_id, build_id):
+        self._read_config()
+        if not self.tests_enabled:
+            return "Tests are disabled by config, skipping"
+
+
         # Retrieve all necessary information
         tag_info = self.session.getTag(tag_id, strict=True)
         build_info = self.session.getBuild(build_id)
