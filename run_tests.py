@@ -57,7 +57,10 @@ class RunTestsTask(BaseTaskHandler):
             archs = []
             if buildTask['arch'] == 'x86_64':
                 archs = ['x86_64']
-            elif buildTask['arch'] == 'i686':
+            elif buildTask['arch'] == 'i686'
+                 or buildTask['arch'] == 'i386'
+                 or buildTask['arch'] == 'i486'
+                 or buildTask['arch'] == 'i586':
                 # Fix arch name for repository
                 archs = ['i386']
             elif buildTask['arch'] == 'noarch':
@@ -70,7 +73,7 @@ class RunTestsTask(BaseTaskHandler):
 
             for arch in archs:
                 # Construct path to the build tag repository
-                repo_path = "/mnt/koji/repos/" + tag_info['name'] + "-build/latest/" + arch + "/"
+                repo_path = "/mnt/koji/repos/" + tag_info['name'].replace("-candidate", "") + "-build/latest/" + arch + "/"
                 # Yum config for installation test
                 (yumcfg_fd, yumcfg_file) = mkstemp(prefix='koji-test-yum-', suffix='.cfg', text=True)
                 os.write(yumcfg_fd, """
