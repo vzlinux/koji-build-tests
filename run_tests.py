@@ -5,6 +5,7 @@ import os
 import shutil
 from tempfile import mkdtemp, mkstemp
 import ConfigParser
+import json
 
 CONFIG_FILE = '/etc/kojid/run_tests.conf'
 
@@ -23,6 +24,10 @@ class RunTestsTask(BaseTaskHandler):
             self.tests_enabled = cp.getboolean('general', 'tests_enabled')
         else:
             self.tests_enabled = True
+        if cp.has_option('general', 'exceptions'):
+            self.tests_exceptions = json.loads(cp.get('general', 'exceptions'))
+        else:
+            self.tests_exceptions = []
 
     # Executes the command and logs its output to the specified file
     def execLog(self, cmdline, logpath, append=False):
@@ -57,9 +62,9 @@ class RunTestsTask(BaseTaskHandler):
             archs = []
             if buildTask['arch'] == 'x86_64':
                 archs = ['x86_64']
-            elif buildTask['arch'] == 'i686'
-                 or buildTask['arch'] == 'i386'
-                 or buildTask['arch'] == 'i486'
+            elif buildTask['arch'] == 'i686' \
+                 or buildTask['arch'] == 'i386' \
+                 or buildTask['arch'] == 'i486' \
                  or buildTask['arch'] == 'i586':
                 # Fix arch name for repository
                 archs = ['i386']
@@ -69,7 +74,9 @@ class RunTestsTask(BaseTaskHandler):
                 raise koji.PostBuildError, "Unsupported build architecture: %s" % (buildTask['arch'])
 
             taskResult = self.session.getTaskResult(buildTask['id'])
-            rpms = [('/mnt/koji/work/' + rpm) for rpm in taskResult['rpms']]
+            rpms = [('/mnt/koji/work/' + rpm) for rpm in taskResult['rpms'] if not any([rpm.startswith(name) for name in self.tests_exceptions])]
+            if len(rpms) == 0:
+                return "No packages to check - packages are either missing or included in the exception list"
 
             for arch in archs:
                 # Construct path to the build tag repository
