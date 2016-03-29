@@ -6,6 +6,7 @@ import shutil
 from tempfile import mkdtemp, mkstemp
 import ConfigParser
 import json
+import subprocess
 
 CONFIG_FILE = '/etc/kojid/run_tests.conf'
 
@@ -69,7 +70,8 @@ class RunTestsTask(BaseTaskHandler):
                 # Fix arch name for repository
                 archs = ['i386']
             elif buildTask['arch'] == 'noarch':
-                archs = ['i386', 'x86_64']
+                # We don't build 32bit version for many packages
+                archs = ['x86_64']
             else:
                 raise koji.PostBuildError, "Unsupported build architecture: %s" % (buildTask['arch'])
 
@@ -80,7 +82,14 @@ class RunTestsTask(BaseTaskHandler):
 
             for arch in archs:
                 # Construct path to the build tag repository
-                repo_path = "/mnt/koji/repos/" + tag_info['name'].replace("-candidate", "") + "-build/latest/" + arch + "/"
+                try:
+                    p = subprocess.Popen(['koji', 'list-targets', '--name', tag_info['name'], '--quiet'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    out, err = p.communicate()
+                    target_repo = out.split()[1]
+                except:
+                    return "Couldn't detect target repo - this task is likely not subjected for tests, skipping..."
+
+                repo_path = "/mnt/koji/repos/" + target_repo + "/latest/" + arch + "/"
                 # Yum config for installation test
                 (yumcfg_fd, yumcfg_file) = mkstemp(prefix='koji-test-yum-', suffix='.cfg', text=True)
                 os.write(yumcfg_fd, """
