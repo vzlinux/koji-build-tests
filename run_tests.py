@@ -34,6 +34,7 @@ class RunTestsTask(BaseTaskHandler):
     def execLog(self, cmdline, logpath, append=False):
         log_fd = open(logpath, "a" if append else "w")
         log_fd.write("==> " + cmdline + "\n")
+        log_fd.write("Exceptions: " + str(self.tests_exceptions))
         log_fd.close()
         res = os.system(cmdline + " >>" + logpath + " 2>&1")
         return res
@@ -76,7 +77,7 @@ class RunTestsTask(BaseTaskHandler):
                 raise koji.PostBuildError, "Unsupported build architecture: %s" % (buildTask['arch'])
 
             taskResult = self.session.getTaskResult(buildTask['id'])
-            rpms = [('/mnt/koji/work/' + rpm) for rpm in taskResult['rpms'] if not any([rpm.startswith(name) for name in self.tests_exceptions])]
+            rpms = [('/mnt/koji/work/' + rpm) for rpm in taskResult['rpms'] if not any([name in rpm for name in self.tests_exceptions])]
             if len(rpms) == 0:
                 return "No packages to check - packages are either missing or included in the exception list"
 
