@@ -29,6 +29,10 @@ class RunTestsTask(BaseTaskHandler):
             self.tests_exceptions = json.loads(cp.get('general', 'exceptions'))
         else:
             self.tests_exceptions = []
+        if cp.has_option('general', 'tag_exceptions'):
+            self.tests_tag_exceptions = json.loads(cp.get('general', 'tag_exceptions'))
+        else:
+            self.tests_tag_exceptions = []
 
     # Executes the command and logs its output to the specified file
     def execLog(self, cmdline, logpath, append=False):
@@ -48,6 +52,9 @@ class RunTestsTask(BaseTaskHandler):
 
         # Retrieve all necessary information
         tag_info = self.session.getTag(tag_id, strict=True)
+        if tag_info['name'] in self.tests_tag_exceptions:
+            return "Tag is in the exceptions list, skipping"
+
         build_info = self.session.getBuild(build_id)
         subtasks = self.session.getTaskChildren(build_info['task_id'])
 
