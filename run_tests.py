@@ -84,7 +84,7 @@ class RunTestsTask(BaseTaskHandler):
                 raise koji.PostBuildError, "Unsupported build architecture: %s" % (buildTask['arch'])
 
             taskResult = self.session.getTaskResult(buildTask['id'])
-            rpms = [('/mnt/koji/work/' + rpm) for rpm in taskResult['rpms'] if not any([name in rpm for name in self.tests_exceptions])]
+            rpms = [('/mnt/koji/work/' + rpm) for rpm in taskResult['rpms'] if not any([name in rpm for name in self.tests_exceptions]) and not "debuginfo" in rpm]
             if len(rpms) == 0:
                 return "No packages to check - packages are either missing or included in the exception list"
 
@@ -116,6 +116,7 @@ name=VirtuozzoLinux
 baseurl=file://%s
 enabled=1
 gpgcheck=0
+exclude=*debuginfo*
 """ % (repo_path))
                 os.close(yumcfg_fd)
 
