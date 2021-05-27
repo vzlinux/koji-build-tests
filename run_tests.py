@@ -2,6 +2,7 @@ import koji
 from koji.tasks import BaseTaskHandler
 import sys
 import os
+import re
 import shutil
 from tempfile import mkdtemp, mkstemp
 import ConfigParser
@@ -125,15 +126,41 @@ exclude=*debuginfo*
 
                 log_fname = "tests-b" + str(buildTask['id']) + '-' + arch + ".log"
                 log_fpath = tmp_dir + "/" + log_fname
-                cmdline = "yum install -v -y --config=%(yumcfg_file)s --installroot=%(tmp_dir)s " % locals() + " ".join(rpms)
+                # Have to use dnf here even in CentOS 7 since yum will fail with parse error
+                # if it meets rich dependencies
+                cmdline = "dnf install -v -y --config=%(yumcfg_file)s --installroot=%(tmp_dir)s " % locals() + " ".join(rpms)
                 res = self.execLog(cmdline, log_fpath)
-                self.uploadFile(log_fpath)
-                shutil.rmtree(tmp_dir)
-                os.unlink(yumcfg_file)
 
                 # Check result
                 if res != 0:
-                    raise koji.PostBuildError, "Installation test failed, see %s for details." % (log_fname)
+                    # Even if we failed, this is not the ultimate results.
+                    # It can arise from tich dependencies aka '(foo if bar)' which can't be resolved by
+                    # dnf/rpm at CentOS 7
+                    success = 1
+                    with open(log_fpath) as f:
+                        for l in f.readlines():
+                            if 'is needed' not in l or 'rpmlib(RichDependencies)' in l:
+                                continue
+                            m = re.search(r'\((\S+) if ([^)]+)\) is needed', l)
+                            if m:
+                                # If we found a rich dep, let's check if its first part can be always installed
+                                p = m.groups(0)[0]
+                                cmdline = "dnf install -v -y --config=%(yumcfg_file)s --installroot=%(tmp_dir)s " % locals() + p
+                                res2 = self.execLog(cmdline, log_fpath, append=True)
+                                if res2 != 0:
+                                    success = 0
+                            else:
+                                success = 0
+
+                    self.uploadFile(log_fpath)
+                    shutil.rmtree(tmp_dir)
+                    os.unlink(yumcfg_file)
+                    if success != 1:
+                        raise koji.PostBuildError, "Installation test failed, see %s for details." % (log_fname)
+                else:
+                    self.uploadFile(log_fpath)
+                    shutil.rmtree(tmp_dir)
+                    os.unlink(yumcfg_file)
 
         return "Result: success"
 
