@@ -139,9 +139,9 @@ exclude=*debuginfo*
                     success = 1
                     with open(log_fpath) as f:
                         for l in f.readlines():
-                            if 'is needed' not in l or 'rpmlib(RichDependencies)' in l:
+                            if 'is needed' not in l or 'rpmlib(RichDependencies)' in l or 'rpmlib(CaretInVersions)' in l:
                                 continue
-                            m = re.search(r'\((\S+) if ([^)]+)\) is needed', l)
+                            m = re.search(r'\((.+) if ([^)]+)\) is needed', l)
                             if m:
                                 # If we found a rich dep, let's check if its first part can be always installed
                                 p = m.groups(0)[0]
